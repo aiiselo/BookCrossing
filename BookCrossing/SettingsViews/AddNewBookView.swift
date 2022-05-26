@@ -38,8 +38,10 @@ struct AddNewBookView: View {
     @State private var description = ""
     @State private var language = ""
     
-    @State private var showingAlert = false
+    @State private var showingErrorAlert = false
+    @State private var goToPrevView = false
     @State private var logMessage = "Changes are saved"
+    @State private var showLoading = false
     
     init(){
             UITableView.appearance().backgroundColor = .clear
@@ -47,8 +49,11 @@ struct AddNewBookView: View {
     
     var body: some View {
         NavigationView {
+
             ZStack{
+                
                 Color("backgroundColor").ignoresSafeArea()
+                
                 VStack(spacing: 16) {
                     
                     VStack {
@@ -66,8 +71,6 @@ struct AddNewBookView: View {
                                     .cornerRadius(12)
                         }
                     }
-                    
-                    
                         
                     Button(action: {changeCoverPhoto()}, label: {
                         Text("Change book cover")
@@ -146,13 +149,32 @@ struct AddNewBookView: View {
                             .background(Color("buttonColor"))
                             .cornerRadius(6)
                             .padding(EdgeInsets(top: 0, leading: 10, bottom: 4, trailing: 10))
-                    }).alert(isPresented:$showingAlert) {
+                    }).alert(isPresented:$showingErrorAlert) {
                         Alert(title: Text(""), message: Text(logMessage), dismissButton: .default(Text("Continue")){
-                                                })
-                                            }
+                                if goToPrevView {
+                                    self.presentation.wrappedValue.dismiss()
+                                }
+                            })
+                       }
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .padding(EdgeInsets(top: 12, leading: 10, bottom: 8, trailing: 10))
+                
+                if showLoading {
+                    ZStack {
+                        Color("backgroundColor")
+                            .ignoresSafeArea()
+                            .opacity(0.8)
+                        VStack(alignment: .center, spacing: 24) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: Color("buttonColor")))
+                                .scaleEffect(3)
+                            Text("Uploading your book")
+                                .foregroundColor(.white)
+                                .font(.custom("GillSans-Light", size: 20))
+                        }
+                    }
+                }
                 
             }
             .navigationBarBackButtonHidden(true)
@@ -191,20 +213,16 @@ struct AddNewBookView: View {
     }
     
     func saveChanges() {
-        titleColor = Color(.white)
-        authorColor = Color(.white)
-        genreColor = Color(.white)
         yearColor = Color(.white)
-        countryColor = Color(.white)
-        locationColor = Color(.white)
         descriptionColor = Color(.white)
-        languageColor = Color(.white)
         
         var imageURL: String = ""
         var isValidImage = false
-        showingAlert = false
         
-        
+        showingErrorAlert = false
+        goToPrevView = false
+        showLoading = false
+
         if isValidFields() {
             
             // If all fields contain valid values ...
@@ -215,23 +233,26 @@ struct AddNewBookView: View {
             // Upload cover photo to storage ...
             
             if isPhotoChanged {
+                showLoading = true
                 if let image = self.image {
                     guard let uid = Auth.auth().currentUser?.uid else { return }
                     let ref = Storage.storage().reference(withPath: ("booksCover/\(bookUid)"))
                     guard let imageData = self.image?.jpegData(compressionQuality: 0.5) else { return }
                     ref.putData(imageData, metadata: nil) { metadata, err in
                         if let err = err {
-                            print("Failed to push image to Storage: \(err)")
+                            showLoading = false
+                            logMessage = "Failed to push image to Storage: \(err)"
+                            showingErrorAlert = true
                             return
                         }
 
                         ref.downloadURL { url, err in
                             if let err = err {
-                                print("Failed to retrieve downloadURL: \(err)")
+                                showLoading = false
+                                logMessage = "Failed to retrieve downloadURL: \(err)"
+                                showingErrorAlert = true
                                 return
                             }
-                        
-                            print("Successfully stored image with url: \(url?.absoluteString ?? "")")
                             imageURL = url?.absoluteString ?? ""
                             
                             
@@ -242,10 +263,11 @@ struct AddNewBookView: View {
                                 newBooksNum = String(oldBooksNum+1)
                             }
                             else {
+                                showLoading = false
                                 logMessage = "Error while updating books statistics"
-                                showingAlert = true
+                                showingErrorAlert = true
                             }
-                            var userData = [
+                            let userData = [
                                 "books_num": newBooksNum,
                             ]
                             
@@ -253,10 +275,10 @@ struct AddNewBookView: View {
                                 .collection("users")
                                 .document(uid).updateData(userData) {
                                     err in
-                                    if let err = err {
-                                        print(err)
+                                    if err != nil {
+                                        showLoading = false
                                         logMessage = "Error while updating books statistics"
-                                        showingAlert = true
+                                        showingErrorAlert = true
                                         return
                                     }
                                 }
@@ -280,12 +302,8 @@ struct AddNewBookView: View {
                                 .collection("books")
                                 .document(uid).collection("books").document(bookUid).setData(values) { err in
                                     if let err = err {
-                                        print(err)
-                                        return
-                                    }
-                                    if !addPostNewBook(imageURL: imageURL) {
-                                        logMessage = "Error while creating post"
-                                        showingAlert = true
+                                        logMessage = err.localizedDescription
+                                        showingErrorAlert = true
                                         return
                                     }
                                 }
@@ -293,36 +311,50 @@ struct AddNewBookView: View {
                                 .collection("books")
                                 .document(uid).setData(["exists": true]) { err in
                                     if let err = err {
-                                        print(err)
+                                        showLoading = false
+                                        logMessage = err.localizedDescription
+                                        showingErrorAlert = true
                                         return
                                     }
-                                    if !addPostNewBook(imageURL: imageURL) {
-                                        logMessage = "Error while creating post"
-                                        showingAlert = true
-                                        return
-                                    }
+                                    showLoading = false
                                     logMessage = "New book has been added"
-                                    showingAlert = true
-                                    print("Success")
+                                    showingErrorAlert = true
                                 }
+                            if !addPostNewBook(imageURL: imageURL) {
+                                showLoading = false
+                                logMessage = "Error while creating post"
+                                showingErrorAlert = true
+                                return
+                            }
+                            showLoading = false
+                            logMessage = "New book has been added"
+                            goToPrevView = true
+                            showingErrorAlert = true
                         }
                     }
                 }
                 else {
+                    showLoading = false
                     logMessage = "Error while uploading photo"
-                    showingAlert = true
+                    showingErrorAlert = true
                     return
                 }
-                    
+    
             }
             else {
+                showLoading = false
                 logMessage = "Please upload cover image"
-                showingAlert = true
+                showingErrorAlert = true
                 return
             }
         }
         else {
-            showingAlert = true
+            logMessage = "Please fill in valid values"
+            if !isValidDescription() {
+                logMessage = "Please write shorter description"
+            }
+            showLoading = false
+            showingErrorAlert = true
             return
         }
 
@@ -342,56 +374,42 @@ struct AddNewBookView: View {
             .collection("users")
             .document(uid).collection("posts").document(postUid).setData(values) { err in
                 if let err = err {
-                    print(err)
                 }
             }
         return true
     }
     
     func isValidFields()->Bool {
+        var flag:Bool = true
         if !isValidField(field: author) {
-            logMessage = "Please enter valid author"
-            authorColor = .orange
-            return false
+            flag = false
         }
-        else if !isValidField(field: title) {
-            logMessage = "Please enter valid title"
-            titleColor = .orange
-            return false
+        if !isValidField(field: title) {
+            flag = false
         }
-        else if !isValidGenre() {
-            logMessage = "Please enter valid genres: Fantasy, Sci-fi, Mystery, Romance, Historical, Horror, Childen or Other. You can choose one."
-            genreColor = .orange
-            return false
+        if !isValidField(field: genre) {
+            flag = false
         }
-        else if !isValidYear(year: year) {
-            logMessage = "Please enter valid year"
+        if !isValidYear(year: year) {
             yearColor = .orange
-            return false
+            flag = false
         }
-        else if !isValidField(field: country) {
-            logMessage = "Please enter valid country"
-            countryColor = .orange
-            return false
+        if !isValidField(field: country) {
+            flag = false
         }
-        else if !isValidLanguage() {
-            logMessage = "Please enter valid language: English, Italian, Chineese, French, Spanish, German, Ukranian, Russian or Other. You can choose one"
-            languageColor = .orange
-            return false
+        if !isValidField(field: language) {
+            flag = false
         }
-        else if !isValidField(field: location) {
-            logMessage = "Please enter valid location"
-            locationColor = .orange
-            return false
+        if !isValidField(field: location) {
+            flag = false
         }
-        else if !isValidDescription() {
-            logMessage = "Please enter shorter description"
+        if !isValidDescription() {
             descriptionColor = .orange
-            return false
+            flag = false
         }
-        else {
-            return true
-        }
+        
+        return flag
+        
     }
     
     func isValidImageURL(url: String)->Bool {
@@ -412,26 +430,6 @@ struct AddNewBookView: View {
         }
     }
     
-    func isValidLanguage()->Bool {
-        let languages = ["English", "Italian", "Chineese", "French", "Spanish", "German", "Ukranian", "Russian", "Other"]
-        if languages.contains(language) {
-            return true
-        }
-        else {
-            return false
-        }
-    }
-    
-    func isValidGenre()->Bool {
-        let genres = ["Fantasy", "Sci-fi", "Mystery", "Romance", "Historical", "Horror", "Children", "Other"]
-        if genres.contains(genre) {
-            return true
-        }
-        else {
-            return false
-        }
-    }
-    
     func isValidField(field: String) -> Bool {
         if field != "" && field.count < 100 {
             return true
@@ -440,7 +438,6 @@ struct AddNewBookView: View {
             return false
         }
     }
-    
     
     func isValidYear(year: String) -> Bool {
         if let yearNum = Int(year) {
@@ -453,7 +450,6 @@ struct AddNewBookView: View {
             return false
         }
     }
-    
     
     func changeCoverPhoto() {
         shouldShowImagePicker.toggle()

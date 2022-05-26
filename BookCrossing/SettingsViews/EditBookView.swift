@@ -35,6 +35,7 @@ struct EditBookView: View {
     @State private var showingAlert = false
     @State private var logMessage = ""
     @State private var showingAlertDelete = false
+    @State private var goToPrevView = false
     
     @Binding var collection: BookData
     
@@ -62,7 +63,7 @@ struct EditBookView: View {
                                 WebImage(url: URL(string: String(coverImageLink)))
                                     .resizable()
                                     .frame(width: 160, height: 180)
-                                    .clipShape(Circle())
+                                    .cornerRadius(12)
                             } else {
                                 Image(coverImage())
                                     .resizable()
@@ -159,6 +160,9 @@ struct EditBookView: View {
                             .padding(EdgeInsets(top: 0, leading: 10, bottom: 4, trailing: 10))
                     }).alert(isPresented:$showingAlert) {
                         Alert(title: Text(""), message: Text(logMessage), dismissButton: .default(Text("Continue")){
+                            if goToPrevView {
+                                self.presentation.wrappedValue.dismiss()
+                            }
                                                 })
                                             }
                 }
@@ -169,34 +173,35 @@ struct EditBookView: View {
             .navigationBarBackButtonHidden(true)
             .toolbar(content: {
                ToolbarItem (placement: .navigation)  {
-                   
-                       HStack(spacing: 15) {
+                   HStack(spacing: 4) {
                            Image(systemName: "arrow.left")
                            Text("Edit book")
                                .font(.custom("GillSans", size: 32))
                                .padding()
-                           Spacer()
+                           Spacer(minLength: 0)
                            Button(action: {
                                removeBookFromBookDatabase(bookId: collection.bookId)
                                updateUserBookStatistics()
                                showingAlertDelete = true
                            }, label: {
                                Image("trashIcon").frame(width: 32, height: 32)
-                           }).alert(isPresented:$showingAlertDelete) {
+                           })
+                           .alert(isPresented:$showingAlertDelete) {
                                Alert(title: Text("Book has been deleted"), message: Text(logMessage), dismissButton: .default(Text("Continue")){
-                                                       })
+                                   self.presentation.wrappedValue.dismiss()
+                               })
                             }
                            
-                           
                        }
-                        .foregroundColor(.white)
-                   
-                   
-                  .onTapGesture {
-                      // code to dismiss the view
+                   .padding(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
+                   .frame(width: UIScreen.main.bounds.size.width)
+                   .foregroundColor(.white)
+                   .onTapGesture {
                       self.presentation.wrappedValue.dismiss()
                   }
+               
                }
+               
             })
             .fullScreenCover(isPresented: $shouldShowImagePicker, onDismiss: nil) {
                         ImagePicker(image: $image)
@@ -215,21 +220,14 @@ struct EditBookView: View {
       return String((0..<length).map{ _ in letters.randomElement()! })
     }
     
-    
-    
     func saveChanges() {
-        titleColor = Color(.white)
-        authorColor = Color(.white)
-        genreColor = Color(.white)
         yearColor = Color(.white)
-        countryColor = Color(.white)
-        locationColor = Color(.white)
         descriptionColor = Color(.white)
-        languageColor = Color(.white)
-        
+        ownerColor = Color(.white)
         var imageURL: String = ""
         var isValidImage = false
         showingAlert = false
+        logMessage = ""
         
         if isEditedOwner() {
             
@@ -238,6 +236,7 @@ struct EditBookView: View {
                     .document(collection.bookOwner).getDocument { snapshot, error in
                         if let error = error {
                             logMessage =  "No user found"
+                            ownerColor = .orange
                             showingAlert = true
                             return
                         }
@@ -254,36 +253,13 @@ struct EditBookView: View {
                         addPostNewExchange(secondUser: collection.bookOwner, secondUserUsername: secondUserUsername, secondUserExchangesNum: secondUserExchangesNum)
                         
                         removeBookFromBookDatabase(bookId: collection.bookId)
+                        updateUserBookStatistics()
                         logMessage = "You changed book owner. Thank you for participating in book crossing!"
+                        goToPrevView = true
                     }
         }
         else {
-            if isPhotoChanged {
-                if let image = self.image {
-                    guard let uid = Auth.auth().currentUser?.uid else { return }
-                    let ref = Storage.storage().reference(withPath: ("booksCover/\(collection.bookId)"))
-                    guard let imageData = self.image?.jpegData(compressionQuality: 0.5) else { return }
-                    ref.putData(imageData, metadata: nil) { metadata, err in
-                        if let err = err {
-                            logMessage = "Failed to push image to Storage: \(err)"
-                            showingAlert = true
-                            return
-                        }
-
-                        ref.downloadURL { url, err in
-                            if let err = err {
-                                logMessage = "Failed to retrieve downloadURL: \(err)"
-                                showingAlert = true
-                                return
-                            }
-                        }
-                        
-                        logMessage = "Successfully stored image"
-                    }
-                }
-                
-            }
-        
+            
             if isValidFields() {
                 // Update book collection
                 
@@ -292,12 +268,10 @@ struct EditBookView: View {
                     "country": collection.bookCountry,
                     "description": collection.bookDescription,
                     "location": collection.bookLocation,
-                    "owner": collection.bookOwner,
                     "title": collection.bookTitle,
                     "year": collection.bookYear,
                     "genre": collection.bookGenre,
                     "language": collection.bookLanguage,
-                    "uid": collection.bookId
                 ]
                 guard let uid = Auth.auth().currentUser?.uid else { return }
                 Firestore.firestore()
@@ -308,14 +282,52 @@ struct EditBookView: View {
                             return
                         }
                         logMessage = "Book information has been changed"
+                        vm.fetchLibrary()
                     }
+                if isPhotoChanged {
+                    if let image = self.image {
+                        guard let uid = Auth.auth().currentUser?.uid else { return }
+                        let ref = Storage.storage().reference(withPath: ("booksCover/\(collection.bookId)"))
+                        guard let imageData = self.image?.jpegData(compressionQuality: 0.5) else { return }
+                        ref.putData(imageData, metadata: nil) { metadata, err in
+                            if let err = err {
+                                logMessage = "Failed to push image to Storage: \(err)"
+                                showingAlert = true
+                                return
+                            }
+
+                            ref.downloadURL { url, err in
+                                if let err = err {
+                                    logMessage = "Failed to retrieve downloadURL: \(err)"
+                                    showingAlert = true
+                                    return
+                                }
+                                
+                                let values = [
+                                    "cover": url?.absoluteString ?? ""
+                                    ]
+                                guard let uid = Auth.auth().currentUser?.uid else { return }
+                                Firestore.firestore()
+                                    .collection("books")
+                                    .document(uid).collection("books").document(collection.bookId).updateData(values) { err in
+                                        if let err = err {
+                                            print(err)
+                                            return
+                                        }
+                                    }
+                                collection.bookCover = url?.absoluteString ?? ""
+                                
+                            }
+                        }
+                        logMessage = "Successfully stored image"
+                    }
+                    
+                }
             }
             else {
                 logMessage = "Please fill in general information"
             }
         }
-        
-        
         showingAlert = true
 
     }
@@ -367,49 +379,36 @@ struct EditBookView: View {
     }
     
     func isValidFields()->Bool {
+        var flag:Bool = true
         if !isValidField(field: collection.bookAuthor) {
-            logMessage = "Please enter valid author"
-            authorColor = .orange
-            return false
+            flag = false
         }
-        else if !isValidField(field: collection.bookTitle) {
-            logMessage = "Please enter valid title"
-            titleColor = .orange
-            return false
+        if !isValidField(field: collection.bookTitle) {
+            flag = false
         }
-        else if !isValidGenre() {
-            logMessage = "Please enter valid genres: Fantasy, Sci-fi, Mystery, Romance, Historical, Horror, Childen or Other. You can choose one."
-            genreColor = .orange
-            return false
+        if !isValidField(field: collection.bookGenre) {
+            flag = false
         }
-        else if !isValidYear(year: collection.bookYear) {
-            logMessage = "Please enter valid year"
+        if !isValidYear(year: collection.bookYear) {
             yearColor = .orange
-            return false
+            flag = false
         }
-        else if !isValidField(field: collection.bookCountry) {
-            logMessage = "Please enter valid country"
-            countryColor = .orange
-            return false
+        if !isValidField(field: collection.bookCountry) {
+            flag = false
         }
-        else if !isValidLanguage() {
-            logMessage = "Please enter valid language: English, Italian, Chineese, French, Spanish, German, Ukranian, Russian or Other. You can choose one"
-            languageColor = .orange
-            return false
+        if !isValidField(field: collection.bookLanguage) {
+            flag = false
         }
-        else if !isValidField(field: collection.bookLocation) {
-            logMessage = "Please enter valid location"
-            locationColor = .orange
-            return false
+        if !isValidField(field: collection.bookLocation) {
+            flag = false
         }
-        else if !isValidDescription() {
-            logMessage = "Please enter shorter description"
+        if !isValidDescription() {
             descriptionColor = .orange
-            return false
+            flag = false
         }
-        else {
-            return true
-        }
+        
+        return flag
+        
     }
     
     func isValidImageURL(url: String)->Bool {
@@ -423,26 +422,6 @@ struct EditBookView: View {
     
     func isValidDescription() -> Bool {
         if collection.bookDescription.count <= 500 {
-            return true
-        }
-        else {
-            return false
-        }
-    }
-    
-    func isValidLanguage()->Bool {
-        let languages = ["English", "Italian", "Chineese", "French", "Spanish", "German", "Ukranian", "Russian", "Other"]
-        if languages.contains(collection.bookLanguage) {
-            return true
-        }
-        else {
-            return false
-        }
-    }
-    
-    func isValidGenre()->Bool {
-        let genres = ["Fantasy", "Sci-fi", "Mystery", "Romance", "Historical", "Horror", "Children", "Other"]
-        if genres.contains(collection.bookGenre) {
             return true
         }
         else {

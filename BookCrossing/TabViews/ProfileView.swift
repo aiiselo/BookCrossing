@@ -10,6 +10,7 @@ import SDWebImageSwiftUI
 
 struct ProfileView: View {
     @Binding var activeTab: Int
+    
     @ObservedObject var vm = AppViewModel()
     @State var showingEditBookScreen = false
     @State var showingAddNewBookScreen = false

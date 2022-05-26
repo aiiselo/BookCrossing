@@ -31,7 +31,7 @@ struct EditProfileView: View {
     @State private var linkColor = Color(.white)
     @State private var bioColor = Color(.white)
     @State private var showingAlert = false
-    @State private var logMessage = "Changes are saved"
+    @State private var logMessage = ""
     init(){
             UITableView.appearance().backgroundColor = .clear
         }
@@ -66,7 +66,9 @@ struct EditProfileView: View {
                     
                     
                         
-                    Button(action: {changeProfilePhoto()}, label: {
+                    Button(action: {
+                        changeProfilePhoto()
+                    }, label: {
                         Text("Change profile photo")
                             .font(.custom("GillSans-Light", size: 20))
                             .foregroundColor(Color("buttonColor"))
@@ -119,7 +121,10 @@ struct EditProfileView: View {
                     .background(Color("backgroundColor"))
                     Spacer()
                     
-                    Button(action: {saveChanges()}, label: {
+                    Button(action: {
+                        saveChanges()
+                        showingAlert = true
+                    }, label: {
                         Text("SAVE CHANGES")
                             .font(.custom("GillSans", size: 18))
                             .foregroundColor(Color.white)
@@ -170,6 +175,8 @@ struct EditProfileView: View {
     func saveChanges() {
         var imageURL: String = ""
         var isValidImage = false
+        logMessage = ""
+        showingAlert = false
         if isPhotoChanged {
             if let image = self.image {
                 guard let uid = Auth.auth().currentUser?.uid else { return }
@@ -243,8 +250,6 @@ struct EditProfileView: View {
         else {
             logMessage = "Please fill in valid values"
         }
-        
-        showingAlert = true
     }
     
     func isValidFields(link: String)->Bool {

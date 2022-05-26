@@ -76,7 +76,7 @@ class AppViewModel: ObservableObject {
         return formatter.string(from: validDate)
     }
     
-    private func fetchPosts() {
+    func fetchPosts() {
         
         guard let uid = Auth.auth().currentUser?.uid else {
             self.errorMessage = "Could not find firebase uid"
@@ -107,7 +107,7 @@ class AppViewModel: ObservableObject {
         
     }
     
-    private func fetchLibrary() {
+    func fetchLibrary() {
         
         guard let uid = Auth.auth().currentUser?.uid else {
             self.errorMessage = "Could not find firebase uid"
@@ -156,7 +156,7 @@ class AppViewModel: ObservableObject {
         
     }
     
-    private func fetchBookCollection() {
+    func fetchBookCollection() {
         
         guard let uid = Auth.auth().currentUser?.uid else {
             self.errorMessage = "Could not find firebase uid"
@@ -194,7 +194,7 @@ class AppViewModel: ObservableObject {
         
     }
 
-    private func fetchCurrentUser() {
+    func fetchCurrentUser() {
         
         guard let uid = Auth.auth().currentUser?.uid else {
             self.errorMessage = "Could not find firebase uid"
@@ -251,7 +251,7 @@ class AppViewModel: ObservableObject {
         }
     }
     
-    private func fetchAllMessages() {
+    func fetchAllMessages() {
         guard let uid = Auth.auth().currentUser?.uid else {
             self.errorMessage = "Could not find firebase uid"
             return
@@ -387,12 +387,3 @@ class AppViewModel: ObservableObject {
     }
 
 }
-//
-//func getDate(date: Double)->String {
-//    let validDate = Date(timeIntervalSince1970: Double(date) / 1000)
-//    let formatter = DateFormatter()
-//    formatter.dateStyle = .long
-//    formatter.timeStyle = .medium
-//
-//    return formatter.string(from: validDate)
-//}

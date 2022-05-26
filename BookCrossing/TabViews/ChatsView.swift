@@ -19,6 +19,7 @@ struct ChatsView: View {
     @State var profileImageURL = ""
     @State var profileNickname = ""
     @State var secondUserUsername = ""
+    @State var chatUserDestination = ""
     @State var dialogueChat:[Message] = []
     var body: some View {
         VStack {
@@ -37,8 +38,9 @@ struct ChatsView: View {
                     VStack(spacing: 2){
                         ForEach(vm.chats) { collection in
                             
-                            NavigationLink(destination: ChatLogsView(chatUserUsername: $secondUserUsername, dialogue: $dialogueChat), isActive: $shouldNavigateToChatLogView) {
+                            NavigationLink(destination: ChatLogsView(chatUserUsername: $secondUserUsername, chatUserDestination: $chatUserDestination, dialogue: $dialogueChat), isActive: $shouldNavigateToChatLogView) {
                                 Button(action: {
+                                    chatUserDestination = collection.secondUser.uid
                                     secondUserUsername = collection.secondUser.username
                                     dialogueChat = collection.dialogue
                                     shouldNavigateToChatLogView = true

@@ -8,6 +8,8 @@
 import SwiftUI
 import Firebase
 import FirebaseAuth
+import UniformTypeIdentifiers
+
 
 struct SettingsView: View {
     
@@ -18,7 +20,7 @@ struct SettingsView: View {
     @State private var errorLog = ""
     @State private var uid = Auth.auth().currentUser?.uid
     @AppStorage("logged") var logged = true
-    @EnvironmentObject var vm: AppViewModel
+    @ObservedObject var vm = AppViewModel()
     
     var body: some View {
         NavigationView {
@@ -85,9 +87,17 @@ struct SettingsView: View {
                         Text("My uid:")
                             .font(.custom("GillSans-Light", size: 18))
                             .foregroundColor(Color("inactiveTextField"))
-                        Text(uid!)
-                            .font(.custom("GillSans-Light", size: 18))
-                            .foregroundColor(Color("inactiveTextField"))
+                        Button(action: {}, label: {
+                            Text(vm.uid)
+                                .font(.custom("GillSans-Light", size: 18))
+                                .foregroundColor(Color("inactiveTextField"))
+                                .onTapGesture() {
+                                        UIPasteboard.general.setValue(vm.uid,
+                                            forPasteboardType: UTType.plainText.identifier)
+                                }
+                        })
+                            
+                                
                         Spacer()
                     }.padding([.horizontal])
                     
