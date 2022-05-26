@@ -2,7 +2,7 @@
 //  Persistence.swift
 //  BookCrossing
 //
-//  Created by Олеся Мартынюк on 20.01.2022.
+//  Created by Олеся Мартынюк on 22.05.2022.
 //
 
 import CoreData

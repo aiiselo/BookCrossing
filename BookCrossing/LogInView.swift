@@ -13,14 +13,15 @@ import FirebaseAuth
 struct LogInView: View {
     @State private var email = ""
     @State private var password = ""
-    @State private var wrongEmail = 0
     @State private var emailColor = Color("inactiveTextField")
-    @State private var wrongPassword = 0
     @State private var passwordColor = Color("inactiveTextField")
-    @State private var showingLoginScreen = false
+    @State private var showingFeedScreen = false
     
+    @State var showResendLinkButton: Bool = false
     @Environment(\.presentationMode) var presentation
-    
+    @State private var errorLog = ""
+    @State private var showingEmailAlert = false
+    @State private var showingPasswordAlert = false
     
     var body: some View {
         NavigationView {
@@ -68,6 +69,18 @@ struct LogInView: View {
                         )
                     .padding(.leading)
                     .padding(.trailing)
+                    HStack {
+                        Spacer()
+                        Button(action: {resetPassword() }) {
+                            Text("Forgot password?")
+                        }
+                        .font(.custom("GillSans", size: 18))
+                        .foregroundColor(Color("inactiveTextField"))
+                        .padding(EdgeInsets(top: 4, leading: 0, bottom: 0, trailing: 14))
+                        .alert(isPresented:$showingPasswordAlert) {
+                            Alert(title: Text("Success"), message: Text("Reset link has been send on your email"), dismissButton: .default(Text("OK")))
+                        }
+                    }
                     
                     Button("LOG IN") {
                         authUser(email: email, password: password)
@@ -81,9 +94,29 @@ struct LogInView: View {
                     .padding(.leading)
                     .padding(.trailing)
                     .padding(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
-
-                    NavigationLink(destination: Text("You are logged in @\(email)"), isActive: $showingLoginScreen) {
+                    
+                    
+                    NavigationLink(destination: Text("You are logged in @\(email)"), isActive: $showingFeedScreen) {
                         EmptyView()
+                    }.padding(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
+                    
+                    Text(errorLog)
+                        .font(.custom("GillSans", size: 18))
+                        .foregroundColor(Color.orange)
+                        .multilineTextAlignment(.center)
+                        .padding(EdgeInsets(top: 4, leading: 0, bottom: 0, trailing: 0))
+                    
+                    if showResendLinkButton {
+                        Button(action: {resendLink() }) {
+                            Text("Resend email confirmation link").underline()
+                        }
+                        .font(.custom("GillSans", size: 18))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+//                        .padding(EdgeInsets(top: 4, leading: 0, bottom: 0, trailing: 0))
+                        .alert(isPresented:$showingEmailAlert) {
+                            Alert(title: Text("Success"), message: Text("Verification link has been sent"), dismissButton: .default(Text("OK")))
+                                                }
                     }
                     
                 }
@@ -105,41 +138,84 @@ struct LogInView: View {
     }
     
     func authUser(email: String, password: String) {
+        emailColor = Color("inactiveTextField")
+        passwordColor = Color("inactiveTextField")
         let result = checkValidFields(email: email, password: password)
-        if result != nil {
-            passwordColor = Color(.orange)
-            wrongPassword = 2
-            emailColor = Color(.orange)
-            wrongEmail = 2
-        }
-        else {
+        if result == nil {
             Auth.auth().signIn(withEmail: email, password: password) {
             (result, error) in
                 if error != nil {
-//                    self.errorLabel.alpha = 1
-//                    self.errorLabel.numberOfLines = 0
-//                    self.errorLabel.textColor = .red
-//                    self.errorLabel.lineBreakMode = .byWordWrapping
-//                    self.errorLabel.text = error?.localizedDescription
-//                    self.errorLabel.sizeToFit()
+                    errorLog = error!.localizedDescription
                 }
                 else {
-                    showingLoginScreen = true
-//                    let storyboard = UIStoryboard(name: "Main", bundle: nil)
-//                    let secondVC = storyboard.instantiateViewController(identifier: "MainPageViewController") as! MainPageViewController
-//                    self.view.window?.rootViewController = secondVC
+                    if Auth.auth().currentUser!.isEmailVerified {
+                        showingFeedScreen = true
+                    } else {
+                        errorLog = "Account email is not verified"
+                        showResendLinkButton = true
+                    }
                 }
             }
         }
     }
     
-    func checkValidFields(email: String, password: String) -> String? {
-            if email == "" ||
-                password == "" {
-                return "Please, fill in all the fields"
+    func checkValidFields(email: String, password: String) -> Int? {
+        if email == "" || password == "" {
+            errorLog = "Please, fill in all fields"
+            if email == "" {
+                emailColor = Color.orange
             }
-            return nil
+            if password == "" {
+                passwordColor = Color.orange
+            }
+            return 0
+        } else {
+            var returnValue = true
+            let emailRegEx = "[A-Z0-9a-z.-_]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,3}"
+            
+            do {
+                let regex = try NSRegularExpression(pattern: emailRegEx)
+                let nsString = email as NSString
+                let results = regex.matches(in: email, range: NSRange(location: 0, length: nsString.length))
+                
+                if results.count == 0
+                {
+                    errorLog = "Invalid email"
+                    emailColor = Color.orange
+                    return 0
+                }
+                
+            } catch let error as NSError {
+                errorLog = "Invalid email"
+                emailColor = Color.orange
+                return 0
+            }
+            return  nil
         }
+    }
+    
+    func resendLink() {
+        Auth.auth().currentUser?.sendEmailVerification(completion: { (error) in
+            if let error = error {errorLog = "Please try again"} else {
+                    showingEmailAlert = true
+            }
+        })
+    }
+    
+    func resetPassword() {
+        passwordColor = Color("inactiveTextField")
+        emailColor = Color("inactiveTextField")
+        Auth.auth().sendPasswordReset(withEmail: email) {  (error) in
+            if email == "" {
+                errorLog = "Please fill in email"
+                emailColor = .orange
+            } else if let error = error {
+                errorLog = "Please try again"
+            } else {
+                showingPasswordAlert = true
+            }
+        }
+    }
 }
 
 struct LogInView_Previews: PreviewProvider {

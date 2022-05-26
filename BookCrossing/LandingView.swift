@@ -8,12 +8,17 @@
 import SwiftUI
 import CoreData
 
+import Firebase
+import GoogleSignIn
+
 struct ContentView: View {
     
-    // AppStorage("_shouldShowOnboarding") or State
-    @AppStorage("_shouldShowOnboarding") var shouldShowOnboarding: Bool = true
-    @State private var showingLoginScreen = false
-    @State private var showingRegistrationScreen = false
+    // AppStorage("_shouldShowOnboarding") or @State
+    @State var shouldShowOnboarding: Bool = true
+    
+    @State private var showingFeedScreen = false
+    @State private var showingPhoneScreen = false
+    
     var body: some View {
         NavigationView {
             VStack(alignment: .customCenter){
@@ -30,7 +35,7 @@ struct ContentView: View {
                     .foregroundColor(Color.white)
                     .padding(.bottom, 16)
                 
-                NavigationLink(destination: RegistrationView(), isActive: $showingRegistrationScreen) {
+                NavigationLink(destination: RegistrationView()) {
                     Text("SIGN UP")
                         .font(.custom("GillSans", size: 18))
                         .foregroundColor(Color.black)
@@ -39,7 +44,7 @@ struct ContentView: View {
                         .cornerRadius(6)
                         .padding(EdgeInsets(top: 0, leading: 10, bottom: 4, trailing: 10))
                 }
-                NavigationLink(destination: LogInView(), isActive: $showingLoginScreen) {
+                NavigationLink(destination: LogInView()) {
                     Text("LOG IN")
                         .font(.custom("GillSans", size: 18))
                         .foregroundColor(Color.white)
@@ -68,21 +73,43 @@ struct ContentView: View {
                 HStack {
                     Button(
                         action: {
-                            print("Edit button was tapped")
+                            authWithGoogle()
                         },
                         label: {
                             Label("GOOGLE", image: "googleIcon")
                         }
                     ).padding()
+                    
+                    NavigationLink(destination: Text("You are logged in "), isActive: $showingFeedScreen) {
+                        EmptyView()
+                    }.padding(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
+                    
                     Spacer()
+                    
                     Button(
                         action: {
-                            print("Edit button was tapped")
+                            authWithFacebook()
                         },
                         label: {
-                            Label("VKONTAKTE", image: "vkicon")
+                            Label("FACEBOOK", image: "fbicon")
                         }
                     ).padding()
+
+                    NavigationLink(destination: Text("You are logged in "), isActive: $showingFeedScreen) {
+                        EmptyView()
+                    }.padding(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
+                    
+//                    Button(
+//                        action: {
+//                            showingPhoneScreen = true
+//                        },
+//                        label: {
+//                            Label("PHONE", image: "phoneicon")
+//                        }
+//                    ).padding()
+//
+//                    NavigationLink(destination: PhoneNumberView(), isActive: $showingPhoneScreen) {
+//                    }.padding(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 0))
                         
                 }
                     .font(.custom("GillSans", size: 18))
@@ -107,6 +134,48 @@ struct ContentView: View {
             })
     }.navigationBarHidden(true)
     }
+    
+    func authWithFacebook() {
+        
+    }
+    
+    func authWithGoogle() {
+        guard let clientID = FirebaseApp.app()?.options.clientID else { return }
+
+        // Create Google Sign In configuration object.
+        let config = GIDConfiguration(clientID: clientID)
+        
+        GIDSignIn.sharedInstance.signIn(with: config, presenting: getRootViewController()) {
+            [self] user, err in
+            if let error = err {
+                print(error.localizedDescription)
+                return
+              }
+
+              guard
+                let authentication = user?.authentication,
+                let idToken = authentication.idToken
+              else {
+                return
+              }
+
+              let credential = GoogleAuthProvider.credential(withIDToken: idToken,
+                                                             accessToken: authentication.accessToken)
+            
+            Auth.auth().signIn(with: credential) { result, err in
+                if let error = err {
+                    print(error.localizedDescription)
+                }
+                guard let user = result?.user else {
+                    return
+                }
+                print(user.displayName ?? "Success")
+                showingFeedScreen = true
+            }
+            
+             
+        }
+    }
 }
 
 
@@ -124,4 +193,16 @@ struct CustomCenter: AlignmentID {
 
 extension HorizontalAlignment {
   static let customCenter: HorizontalAlignment = .init(CustomCenter.self)
+}
+
+extension View {
+    func getRootViewController()->UIViewController{
+        guard let screen = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            return .init()
+        }
+        guard let root = screen.windows.first?.rootViewController else {
+            return .init()
+        }
+        return root
+    }
 }
